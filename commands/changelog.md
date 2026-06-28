@@ -1,6 +1,5 @@
 ---
-name: changelog
-description: Update CHANGELOG.md with recent changes. Use after completing meaningful code changes, before committing. Auto-invoked when changes are ready to be recorded.
+description: Update CHANGELOG.md with recent changes. Use after completing meaningful code changes, before committing.
 argument-hint: "[description of changes (optional)]"
 allowed-tools: Read, Edit, Grep, Glob, Bash(git diff*), Bash(git log*)
 ---
@@ -13,7 +12,7 @@ Update `CHANGELOG.md` to reflect recent changes made in this session.
 
 1. **Identify changes**: If `$ARGUMENTS` is provided, use that description. Otherwise, review recent work by checking `git diff` (staged and unstaged) and the conversation context to understand what changed.
 
-2. **Read current changelog**: Read `CHANGELOG.md` to see existing entries and avoid duplicates.
+2. **Read current changelog**: Read `CHANGELOG.md` to see existing entries and avoid duplicates. If it does not exist, create it with a `# Changelog` heading and an `## [Unreleased]` section.
 
 3. **Categorize changes** using Keep a Changelog sections:
    - **Added** — new features, files, capabilities

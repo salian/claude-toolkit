@@ -1,0 +1,18 @@
+{
+  "name": "salian-claude-toolkit",
+  "owner": {
+    "name": "Pranab Salian",
+    "email": "pranab@salian.in"
+  },
+  "metadata": {
+    "description": "Salian's Claude Toolkit — reusable Claude Code skills and commands.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "salian-claude-toolkit",
+      "source": "./",
+      "description": "A prompt-pack build/verify/review pipeline plus workflow commands and skills (changelog, smart commits, learning capture, skill management)."
+    }
+  ]
+}

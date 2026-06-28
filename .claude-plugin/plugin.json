@@ -1,0 +1,13 @@
+{
+  "name": "salian-claude-toolkit",
+  "version": "0.1.0",
+  "description": "Salian's Claude Toolkit: a prompt-pack build/verify/review pipeline plus workflow commands and skills (changelog, smart commits, learning capture, skill management).",
+  "author": {
+    "name": "Pranab Salian",
+    "email": "pranab@salian.in"
+  },
+  "homepage": "https://github.com/salian/salian-claude-toolkit",
+  "repository": "https://github.com/salian/salian-claude-toolkit",
+  "license": "MIT",
+  "keywords": ["claude-code", "skills", "commands", "workflow", "prompt-packs", "code-review", "changelog", "git"]
+}

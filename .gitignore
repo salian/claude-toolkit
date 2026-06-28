@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Editor / local
+*.swp
+.idea/
+.vscode/
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# Node (in case skills grow tooling)
+node_modules/

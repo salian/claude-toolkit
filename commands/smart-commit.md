@@ -1,5 +1,4 @@
 ---
-name: smart-commit
 description: Stage changes, update the changelog, and create a well-formatted git commit. Use when the user asks to commit, save progress, or checkpoint work.
 argument-hint: "[commit message (optional)]"
 allowed-tools: Read, Edit, Grep, Glob, Bash(git *)
@@ -13,7 +12,7 @@ Create a git commit with automatic changelog update and well-crafted commit mess
 
 1. **Check status**: Run `git status` and `git diff` to understand what changed. If there are no changes, tell the user and stop.
 
-2. **Update changelog**: Read `CHANGELOG.md` and add entries for any changes not yet recorded. Follow Keep a Changelog format under `## [Unreleased]`. Do not duplicate existing entries.
+2. **Update changelog**: If the project has a `CHANGELOG.md`, read it and add entries for any changes not yet recorded. Follow Keep a Changelog format under `## [Unreleased]`. Do not duplicate existing entries. Skip this step if the project has no changelog.
 
 3. **Stage files**: Stage all relevant changed files. Never stage:
    - `.DS_Store`
@@ -34,7 +33,7 @@ Create a git commit with automatic changelog update and well-crafted commit mess
 
 ## Rules
 
-- Always update CHANGELOG.md before committing (include it in the commit)
+- Always update CHANGELOG.md before committing when one exists (include it in the commit)
 - Never amend previous commits unless explicitly asked
 - Never push unless explicitly asked
 - Never use `--no-verify`
