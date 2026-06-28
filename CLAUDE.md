@@ -7,7 +7,7 @@ everything here generic and self-contained — do not assume a specific consumin
 ## Repository layout
 
 - `.claude-plugin/plugin.json` — plugin manifest (name, version, metadata)
-- `.claude-plugin/marketplace.json` — marketplace listing so others can `/plugin marketplace add salian/salian-claude-toolkit`
+- `.claude-plugin/marketplace.json` — marketplace listing so others can `/plugin marketplace add salian/claude-toolkit`
 - `commands/<name>.md` — slash commands, invoked explicitly by the user as `/<name>`
 - `skills/<name>/SKILL.md` — skills, auto-invoked by Claude based on their `description`
 

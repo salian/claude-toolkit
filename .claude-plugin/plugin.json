@@ -6,8 +6,8 @@
     "name": "Pranab Salian",
     "email": "pranab@salian.in"
   },
-  "homepage": "https://github.com/salian/salian-claude-toolkit",
-  "repository": "https://github.com/salian/salian-claude-toolkit",
+  "homepage": "https://github.com/salian/claude-toolkit",
+  "repository": "https://github.com/salian/claude-toolkit",
   "license": "MIT",
   "keywords": ["claude-code", "skills", "commands", "workflow", "prompt-packs", "code-review", "changelog", "git"]
 }

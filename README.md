@@ -34,7 +34,7 @@ A prompt-pack build pipeline — run them in order — plus a few utilities.
 ### As a plugin (recommended — syncs across machines)
 
 ```
-/plugin marketplace add salian/salian-claude-toolkit
+/plugin marketplace add salian/claude-toolkit
 /plugin install salian-claude-toolkit@salian-claude-toolkit
 ```
 
@@ -45,8 +45,8 @@ Once installed, the commands and skills are available in every project on that m
 Copy or symlink the pieces into your Claude Code config:
 
 ```bash
-git clone https://github.com/salian/salian-claude-toolkit.git
-cd salian-claude-toolkit
+git clone https://github.com/salian/claude-toolkit.git
+cd claude-toolkit
 
 # user-level (all projects)
 ln -s "$PWD/commands"/*.md   ~/.claude/commands/
