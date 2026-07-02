@@ -50,6 +50,8 @@ Apply the following engineering philosophy:
 - Cost-efficient architecture preferred
 - Explicit folder structure discipline
 - **Design system consistency** — if the project has a component library or design system, all page/view files must use shared components, never raw HTML equivalents. If the project uses a token-based styling system (CSS variables, design tokens, theme), page files must use semantic tokens, never hard-coded color/spacing values. These rules must be enforced by automated tooling (linter rules, CI checks), not just documentation. See the "UI Consistency Guardrails" section below.
+- **Global name discipline (no collisions, no drift)** — every persistent schema object (table, enum, shared/reference table) lives in ONE global namespace recorded in the Schema Object Registry (STEP 3.5). (a) **Domain-prefix any name that is a generic noun** (`task`, `contact`, `message`, `module`, `assessment`, `document`, `payment`, `agent`, `status`, …) or that could plausibly recur in another module — `crm_task`, `inbox_message`; when two milestones each have an "X", prefix **both**, never let one squat the bare name. (b) **Each object is declared by exactly ONE (owner) milestone**; every other milestone consumes it by its exact registry name and never re-declares it. Names are drawn from the registry **verbatim**, never re-invented per pack. (Follow the project's schema-conventions ADR if one exists.) This is the structural fix for the most common cross-pack defect: two packs coining the same table name, or a consumer pack referencing a table by a different name than its owner actually declares.
+- **Spec↔code drift gates (canonical doc → mechanical check)** — every canonical, human-authored spec that governs generated code (data-model/schema doc, interface contracts, design tokens, env-var inventory) gets an automated drift gate wired into the project's check target, not just prose. Silent drift here is the expensive kind: a schema column can sit undocumented across dozens of migrations before anyone notices, because nothing mechanically compares doc to code. If the project has a canonical schema/data-model doc **and** a migration tool, the first persistence milestone must establish a schema⇄spec drift gate — see the "Schema/Spec Consistency Guardrails" section below.
 - CLAUDE.md is canonical engineering law — read it before generating prompts and embed its rules into every milestone prompt
 
 If constraints are mentioned in CLAUDE.md (hosting / language / library restrictions, commit conventions, testing conventions, verification steps, or self-improvement behaviors), embed these constraints inside the generated Prompt-Pack. Each prompt must be self-sufficient.
@@ -106,16 +108,50 @@ When splitting, group by cohesion: data layer + API routes in one sub-milestone,
 
 ---
 
+## STEP 3.5: GENERATE THE SCHEMA OBJECT REGISTRY (GLOBAL NAMESPACE)
+
+Before generating any pack, do ONE global pass over the specs + the milestone decomposition and enumerate **every persistent schema object the product needs** — every table, every enum, every shared/reference table — into `docs/prompt-packs/_SCHEMA_REGISTRY.md`. This is the schema analogue of `_PREAMBLE.prompt.md`: generated once, authoritative, and **referenced (never re-derived)** by every pack. Skip it only for products with no persistence layer.
+
+It exists to make two whole defect classes *structurally impossible* rather than caught in a post-hoc audit:
+- **Collisions** — two packs declaring the same table/enum name (duplicate `CREATE TABLE` / duplicate barrel export → broken migration + typecheck).
+- **Schema↔consumer drift** — a UI/consumer pack referencing a table by a different name than the owner pack actually declares (the consumer builds against a symbol that doesn't exist).
+
+Record one row per object:
+
+```
+| object (concept)                   | kind  | owner pack | canonical name              | one-line shape                     | consumer packs |
+|------------------------------------|-------|-----------|-----------------------------|------------------------------------|----------------|
+| trainer↔scheduled-class allocation | table | 12a       | class_trainer_allocation    | tenant, class FK, trainer FK, role | 12b, 21a       |
+| trainer↔TAS-strategy allocation    | table | 08a       | tas_trainer_allocation      | tenant, tas FK, trainer FK, units[]| 18a            |
+| person document type               | enum  | 09a       | document_type               | person-document discriminator      | …              |
+| application document-requirement   | enum  | 26a       | requirement_document_type   | application doc requirement type   | 26c            |
+```
+
+Rules:
+1. **One owner per object** — the earliest milestone that needs it persisted (usually the module's `*_SCHEMA` pack). The owner DECLARES it (its Section 7); every other pack CONSUMES it (their Section 2).
+2. **Canonical name obeys the STEP-2 naming discipline** — domain-prefix any generic or collision-prone noun; two concepts sharing a noun become two differently-prefixed objects (`tas_…` vs `class_…`), each its own row + owner.
+3. **No name is owned twice.** If two milestones each need "an X", that is two rows with two prefixed names — never one bare name claimed by both.
+4. **Reference/shared (non-tenant) tables and enums are in the registry too** — a reused `status`/`document_type` enum collides just as easily as a table.
+5. **An object that already has an owner is never re-declared downstream.** If a later pack must change it, it EXTENDS the existing object (and says so in its Context Snapshot) — it does not create a second one.
+
+Every subsequent step reads names from this registry. When pack generation is delegated to subagent batches (STEP 4), each batch is handed this file and uses its names verbatim.
+
+---
+
 ## STEP 4: GENERATE PROMPT-PACK FILES
 
 Output all prompt-pack files to `docs/prompt-packs/` relative to the project root.
 
 **Note on examples:** the table examples in sections 8 and 11 below use Next.js/TypeScript conventions (`route.ts`, `requireCsrf()`, `(dashboard)/`) purely to illustrate the format. When generating packs, translate every example to the target project's actual stack, file layout, and guard functions — never copy example identifiers verbatim.
 
+**When generation is delegated to subagent batches:** hand every batch the `_SCHEMA_REGISTRY.md` (STEP 3.5) and instruct it to use registry names **verbatim** — for both objects the pack OWNS (Section 7) and objects it CONSUMES (Section 2) — and to never coin a schema-object name absent from the registry. If a batch discovers a genuinely new object, it adds a row to the registry (claiming ownership) BEFORE declaring it, so a sibling batch can't independently coin the same or a conflicting name. Parallel batches that each invent names are exactly how the same table gets declared twice, or a consumer and its owner diverge on a name.
+
 ### Structure:
 
 ```
 /docs/prompt-packs/
+  _PREAMBLE.prompt.md       (shared sections 13–18)
+  _SCHEMA_REGISTRY.md       (global schema-object namespace — STEP 3.5)
   00_RUNBOOK_ENFORCER.prompt.md
   01_PROJECT_BOOTSTRAP.prompt.md
   02_ARCHITECTURE_FOUNDATION.prompt.md
@@ -133,6 +169,7 @@ Example: `M2 -- Core Domain Implementation`
 #### 2. Context Snapshot
 - Current repo state
 - Expected existing files
+- **Consumed schema objects** — every table/enum this milestone READS but does not own, listed **by its exact canonical name from `_SCHEMA_REGISTRY.md` + its owner pack** (e.g. "consumes `class_trainer_allocation` (owner 12a)"). Never paraphrase, guess, or re-invent a consumed name — a consumer that references a guessed name the owner never declared is a build failure. If an object this milestone would otherwise "create" already has an owner in the registry, do NOT re-declare it: consume it, or (if it must change) EXTEND it and say so explicitly.
 - Prior milestones completed
 - Stack constraints
 - Hosting constraints (if applicable)
@@ -166,7 +203,7 @@ Prevent overbuilding by listing what this milestone does NOT do.
 - Hosting limitations
 
 #### 7. Required Deliverables
-Explicit list of files to generate/update, with full paths.
+Explicit list of files to generate/update, with full paths. **Every NEW persistent schema object (table/enum) declared here MUST be an object this milestone OWNS in `_SCHEMA_REGISTRY.md`, named EXACTLY as the registry records it** (domain-prefixed per STEP 2). Do NOT declare an object owned by another pack — consume it via Section 2 instead. Do NOT coin a schema-object name absent from the registry; if the milestone reveals a genuinely new object, add a registry row (with this pack as owner) first, then declare it here.
 
 #### 8. Integration Wiring Checklist
 
@@ -369,6 +406,7 @@ The `/docs/prompt-packs/README.md` must include:
 
 - Execution order (list all prompts in sequence)
 - Instruction to read `_PREAMBLE.prompt.md` before executing any milestone
+- Instruction to treat `_SCHEMA_REGISTRY.md` as the authoritative schema-object namespace — a pack declares only the objects it OWNS there and consumes every other by its exact registry name (never re-declares or renames)
 - How to resume after partial execution
 - How to revert last milestone
 - How to regenerate corrupted files
@@ -425,6 +463,8 @@ Walk every generated pack against this checklist and fix violations before repor
 - [ ] `_PREAMBLE.prompt.md` exists, defines all five verification passes, and every pack's reference block says "5 passes"
 - [ ] README.md lists every pack (including sub-milestone letter files) in execution order
 - [ ] Each pack's Context Snapshot lists exactly the prior milestones that exist as files — no gaps, no phantom milestones
+- [ ] **`_SCHEMA_REGISTRY.md` exists** and every table/enum named in any pack's Section 7 (declared) or Section 2 (consumed) appears as a registry row with exactly one owner.
+- [ ] **Registry conformance — no collisions, no drift.** Extract every schema object each pack DECLARES (Section 7) and CONSUMES (Section 2), and assert: (a) **no** table/enum name is declared by more than one pack; (b) every CONSUMED name exists in the registry with a declaring owner; (c) no consumed name is a paraphrase/variant of an owned name — the drift check (e.g. a pack consumes `crm_contact` but the owner declares `contact`, or consumes `lms_module` but the owner declares `module`); (d) every OWNED name obeys the STEP-2 domain-prefix rule — flag bare generic nouns (`task`, `contact`, `message`, `module`, `assessment`, `document`, `payment`, `agent`, `status`, …) that lack a domain prefix. Any hit is fixed (rename + update the registry + every referencing pack) before declaring done. *This mechanical pass is what converts collision-catching from a post-hoc audit into a generation-time gate.*
 
 ---
 
@@ -478,6 +518,42 @@ When generating milestone prompts that include UI deliverables:
 2. **Section 8 (Integration Wiring Checklist)** must include a verification row confirming all page files pass both the element-level linter rule and the token-level CI check.
 3. **Section 13 (Run → Observe → Fix Loop)** must include the design system CI check alongside standard lint and type checks.
 4. **Section 15 (Overbuild Prevention)** must include: "Do NOT use raw HTML elements that have design system equivalents. Do NOT use hard-coded style values that have semantic token equivalents."
+
+---
+
+## SCHEMA / SPEC CONSISTENCY GUARDRAILS
+
+If the project has a **canonical schema / data-model spec** (a human-authored doc that is the source of truth for tables/columns/enums) **and** a migration tool, the first milestone that introduces persistence must establish **three layers of enforcement** that keep the built database from drifting out of sync with that spec — in BOTH directions. Documentation alone is insufficient: in a production project a real column sat undocumented in the spec across a dozen migrations before an audit caught it, because nothing mechanically compared the two.
+
+This is the database analog of the UI guardrails above. Gate it on the capability (canonical schema doc + migration tool present) exactly as the UI layers gate on "has a design system" — do NOT add it at the bare scaffold milestone, where there are no tables, no populated spec sections, and no migrations to reconcile. It belongs in the first pack that introduces a schema, so it protects every migration thereafter.
+
+### Layer 1: CLAUDE.md schema-authority rule
+
+Add (or confirm) a CLAUDE.md rule that the schema spec is canonical: packs never invent tables/columns — a pack that needs a new one edits the spec doc in the **same commit**, flagged. This is the human-facing law the mechanical layers enforce.
+
+### Layer 2: generation-time name gate (already STEP 3.5)
+
+The Schema Object Registry + Generator Self-Audit (STEP 3.5) is the first mechanical layer: it catches cross-pack name collisions and paraphrase-drift (`contact` vs `crm_contact`) at generation time, before any code is built. Nothing new to author here — ensure every persistence pack declares/consumes names through the registry.
+
+### Layer 3: CI schema⇄spec drift gate
+
+Add a CI script (wired into the project's main check/lint target) that parses the built schema from the migration tool's output and the tables/columns from the spec doc, and fails on drift. Enforce, at minimum:
+
+- **Backward drift (hard fail):** every built table and every built column must be documented in the spec. This is the guarantee the spec never silently falls behind the database — the direction that rots invisibly, and the primary reason this gate exists.
+- **Forward gap (bounded, optional per project):** a spec table with no migration must be explicitly acknowledged (e.g. a `DEFERRED` allowlist) rather than silently missing, with a **ratchet** that fails once a deferred table is actually built (forcing its removal) or is missing from the spec (stale entry). Include this layer only for **spec-ahead-of-build** projects (prompt-pack projects, where the spec is the forward target); an ad-hoc repo where code leads the spec wants the backward check alone.
+
+The script is **tailored to the repo, not copied.** It must parse the actual migration format (Drizzle SQL, Prisma schema, Rails/Alembic/Flyway migrations, raw SQL) and the actual spec-doc conventions of THIS project. A generic copy that doesn't parse the real spec is worse than none — it is either vacuously green (worthless) or noisily red (gets disabled), and a rubber-stamp CI gate trains the team to ignore CI. Carve out framework-managed tables the spec intentionally omits (e.g. auth-adapter tables).
+
+**Acceptance bar (required): seed it red-then-green.** The milestone is not done until the guard is demonstrated to (1) FAIL on a planted drift — add a throwaway column absent from the spec, confirm the check catches it — and (2) PASS on the clean tree. A drift gate that has never been observed to fail is not known to work.
+
+### Embedding in milestone prompts
+
+When generating the persistence-introducing milestone and every later one that touches the schema:
+
+1. **Section 6 (Stack Constraints)** must state that the schema spec is canonical and that the drift gate enforces it.
+2. **Section 8 (Integration Wiring Checklist)** must include a row confirming new tables/columns are documented in the spec and the drift gate passes.
+3. **Section 13 (Run → Observe → Fix Loop)** must include the drift gate alongside standard lint/type checks.
+4. **Section 15 (Overbuild Prevention)** must include: "Do NOT add a table or column without documenting it in the schema spec in the same commit."
 
 ---
 
